@@ -4,11 +4,12 @@ from django.http import JsonResponse
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
+from apis.utils.cabinet_modbus_manager import ModbusManager
 # Create your views here.
 
 
-class MiControlView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+class ControlView(APIView):
+    # permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         return Response(data={}, status=200)

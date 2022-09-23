@@ -4,5 +4,5 @@ from .views import *
 app_name = 'apis'
 
 urlpatterns = [
-    path('micontrol/', MiControlView.as_view(), name='micontrol'),
+    path('micontrol/', ControlView.as_view(), name='control'),
 ]
