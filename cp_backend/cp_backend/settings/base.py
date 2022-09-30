@@ -41,7 +41,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
-    'apis',
+    'api',
     'django_cleanup.apps.CleanupConfig',
 ]
 
@@ -92,7 +92,7 @@ WSGI_APPLICATION = 'cp_backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': 'apis/db/cp_db.sqlite',
+        'NAME': 'api/db/cp_db.sqlite',
     }
 }
 
