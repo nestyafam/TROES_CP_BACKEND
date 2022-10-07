@@ -46,6 +46,9 @@ class ModbusManager:
 
     def __init__(self,
                  modbus_ip=system_details["ip"],
+                 pcs_ip=system_details["pcs_config"].get("ip"),
+                 bms_ip=system_details["bms_config"].get("ip"),
+                 arm_ip=system_details["arm_config"].get("ip"),
                  slave_idx=1,
                  modbus_timeout=10.0,
                  bc_count=system_details["bc_count"],
@@ -64,8 +67,12 @@ class ModbusManager:
         # battery cell count per pack
         self.cell_count = cell_count
         self.source_id = source_id
-
-
+        self.pcs_ip = pcs_ip
+        self.bms_ip = bms_ip
+        self.arm_ip = arm_ip
+        self.pcs_master = mt.TcpMaster(self.pcs_ip)
+        self.bms_master = mt.TcpMaster(self.bms_ip)
+        self.arm_master = mt.TcpMaster(self.arm_ip)
 
     def get_modbus_data(self, master, fields, starting_address, simulation=SIMULATION):
         hold_value = None
@@ -126,7 +133,7 @@ class ModbusManager:
         master = mt.TcpMaster(self.modbus_ip)
         if control_point in system_fields.keys():
             address = system_fields[control_point].get("address")
-            data = self.get_modbus_data(master, fields = [control_point], starting_address=address)
+            data = self.get_modbus_data(master, fields=[control_point], starting_address=address)
         elif control_point in sub_system_fields.keys():
 
             sub_system_id = kwargs.get("sub_system_id", None)
@@ -134,8 +141,8 @@ class ModbusManager:
                 print("here2")
                 raise Exception("Enter sub system id")
             else:
-                address = sub_system_fields[control_point].get("address") +  \
-                          (sub_system_id*sub_system_fields[control_point].get("multiplier"))
+                address = sub_system_fields[control_point].get("address") + \
+                          (sub_system_id * sub_system_fields[control_point].get("multiplier"))
                 data = self.get_modbus_data(master, fields=[control_point], starting_address=address)
         print("data: ", data)
         return data[control_point]
@@ -164,13 +171,14 @@ class ModbusManager:
                 outdict.update(data)
         else:
 
-            for sub_system_id in range(1, self.bc_count+1):
+            for sub_system_id in range(1, self.bc_count + 1):
                 sub_system_data = {}
                 print("getting subsystem values for ", sub_system_id)
                 for control_point, address_details in sub_system_fields.items():
                     sub_system_data.update(self.get_modbus_data(master, fields=[control_point],
-                                                starting_address=(address_details["address"]) +
-                                                                 (int(sub_system_id) * address_details["multiplier"])))
+                                                                starting_address=(address_details["address"]) +
+                                                                                 (int(sub_system_id) * address_details[
+                                                                                     "multiplier"])))
                 outdict.update({sub_system_id: sub_system_data})
         return outdict
 
@@ -213,12 +221,10 @@ class ModbusManager:
                     toggle_values = sub_system_fields[control_point].get("toggle_values")
                     value = toggle_values[1 - toggle_values.index(current_value)]
                 address = sub_system_fields[control_point].get("address") + \
-                             sub_system_fields[control_point].get("multiplier") * sub_system_id
+                          sub_system_fields[control_point].get("multiplier") * sub_system_id
                 return self.write_single_register(address, value)
             else:
                 raise Exception("enter sub_system_id")
-
-
 
 
 if __name__ == "__main__":
