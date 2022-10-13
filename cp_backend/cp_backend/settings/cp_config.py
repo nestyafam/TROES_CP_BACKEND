@@ -7,8 +7,13 @@ SYSTEM_FIELDS = {
             "length": 2,
             "toggle_values": [0, 1]
         },
-        "pcs_start_stop": {
+        "pcs_start": {
             "address": 53900,
+            "length": 2,
+            "toggle_values": [0, 1]
+        },
+        "pcs_stop": {
+            "address": 53901,
             "length": 2,
             "toggle_values": [0, 1]
         },
@@ -34,7 +39,8 @@ SYSTEM_FIELDS = {
             "address": 40003,
             "multiplier": 8,
             "toggle_values": [0, 1]
-        }, "km3": {
+        },
+        "km3": {
             "address": 40004,
             "multiplier": 8,
             "toggle_values": [0, 1]
@@ -145,20 +151,20 @@ SUB_SYSTEM_FIELDS = {
 }
 
 SYSTEM_DETAILS = {
-    "ip": "10.8.0.10",
+    "ip": "10.8.0.3",
     "bc_count": 4,
     "bsu_count": 12,
     "cell_count": 16,
-    "pcs_config": {
-        "ip": "192.168.1.10",
-        "port": "502"
+    "pcs": {
+        "ip": "10.8.0.3",
+        "port": 502
     },
-    "bms_config": {
-        "ip": "192.168.1.100",
-        "port": "502"
+    "bms": {
+        "ip": "10.8.0.3",
+        "port": 2502
     },
-    "arm_config": {
-        "ip": "192.168.1.121",
-        "port": "502"
+    "arm": {
+        "ip": "10.8.0.3",
+        "port": 3502
     }
 }

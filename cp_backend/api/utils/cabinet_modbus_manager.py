@@ -11,7 +11,7 @@ from cabinet_multipliers import RTUMultiplier
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "cp_backend.cp_backend.settings")
 django.setup()
-SIMULATION = True
+SIMULATION = False
 sub_system_fields = settings.SUB_SYSTEM_FIELDS
 system_fields = settings.SYSTEM_FIELDS
 system_details = settings.SYSTEM_DETAILS
@@ -45,10 +45,10 @@ class ModbusManager:
     max_regs_per_request = 100
 
     def __init__(self,
-                 modbus_ip=system_details["ip"],
-                 pcs_ip=system_details["pcs_config"].get("ip"),
-                 bms_ip=system_details["bms_config"].get("ip"),
-                 arm_ip=system_details["arm_config"].get("ip"),
+                 modbus_ip=None,
+                 pcs_details=None,
+                 bms_details=None,
+                 arm_details=None,
                  slave_idx=1,
                  modbus_timeout=10.0,
                  bc_count=system_details["bc_count"],
@@ -56,7 +56,23 @@ class ModbusManager:
                  cell_count=system_details["cell_count"],
                  source_id=None,
                  **kwargs):
-
+        if modbus_ip is None:
+            self.modbus_ip = system_details["ip"]
+        if bms_details is None:
+            self.bms_details = {
+                "ip": system_details["bms"].get("ip"),
+                "port": system_details["bms"].get("ip")
+            }
+        if arm_details is None:
+            self.arm_details = {
+                "ip": system_details["arm"].get("ip"),
+                "port": system_details["arm"].get("ip")
+            }
+        if pcs_details is None:
+            self.pcs_details = {
+                "ip": system_details["pcs"].get("ip"),
+                "port": system_details["pcs"].get("ip")
+            }
         self.modbus_ip = modbus_ip
         self.slave_idx = slave_idx
         self.modbus_timeout = modbus_timeout
@@ -67,12 +83,6 @@ class ModbusManager:
         # battery cell count per pack
         self.cell_count = cell_count
         self.source_id = source_id
-        self.pcs_ip = pcs_ip
-        self.bms_ip = bms_ip
-        self.arm_ip = arm_ip
-        self.pcs_master = mt.TcpMaster(self.pcs_ip)
-        self.bms_master = mt.TcpMaster(self.bms_ip)
-        self.arm_master = mt.TcpMaster(self.arm_ip)
 
     def get_modbus_data(self, master, fields, starting_address, simulation=SIMULATION):
         hold_value = None
@@ -104,7 +114,8 @@ class ModbusManager:
 
                     if field.lower() not in ["spare", "reserved", "reserve"]:
                         print("field: ", field)
-                        val = round(RTUMultiplier.get_cabinet_multiplier(field) * hold_value[idx], 4)
+                        val = round(RTUMultiplier.get_cabinet_multiplier(field) * getSignedNumber(hold_value[idx], 16),
+                                    4)
                         return_dict.update({field: val})
             hold_value = master.execute(slave=self.slave_idx, function_code=md.READ_HOLDING_REGISTERS,
                                         starting_address=temp_starting_address,
@@ -119,7 +130,7 @@ class ModbusManager:
             for idx, field in enumerate(temp_fields):
                 if field.lower() not in ["spare", "reserved", "reserve"]:
                     print("field: ", field)
-                    val = round(RTUMultiplier.get_cabinet_multiplier(field) * hold_value[idx], 4)
+                    val = round(RTUMultiplier.get_cabinet_multiplier(field) * getSignedNumber(hold_value[idx], 16), 4)
                     return_dict.update({field: val})
 
             print("dict: ", return_dict)
@@ -130,34 +141,65 @@ class ModbusManager:
         return return_dict
 
     def read_single_control_point(self, control_point, **kwargs):
-        master = mt.TcpMaster(self.modbus_ip)
-        if control_point in system_fields.keys():
-            address = system_fields[control_point].get("address")
-            data = self.get_modbus_data(master, fields=[control_point], starting_address=address)
-        elif control_point in sub_system_fields.keys():
-
-            sub_system_id = kwargs.get("sub_system_id", None)
-            if not sub_system_id:
-                print("here2")
-                raise Exception("Enter sub system id")
-            else:
-                address = sub_system_fields[control_point].get("address") + \
-                          (sub_system_id * sub_system_fields[control_point].get("multiplier"))
+        field_types = ["pcs", "bms", "arm"]
+        for field_type in field_types:
+            master = mt.TcpMaster(host=system_details[field_type].get("ip"),
+                                  port=system_details[field_type].get("port"))
+            system_field_details = system_fields[field_type]
+            sub_system_field_details = sub_system_fields[field_type]
+            print(system_field_details.keys())
+            if control_point in system_field_details.keys():
+                print("system field")
+                control_point_details = system_field_details[control_point]
+                print("control point details: ", control_point_details)
+                address = system_field_details[control_point].get("address")
+                print("address: ", address)
                 data = self.get_modbus_data(master, fields=[control_point], starting_address=address)
+            elif control_point in sub_system_field_details.keys():
+                print("sub system field")
+                if kwargs.get("bmu_no", None) is not None:
+                    control_point_details = sub_system_field_details[control_point]
+                    address = control_point_details["address"] + (control_point_details["multiplier"] *
+                                                                  kwargs.get("bmu_no"))
+                    try:
+                        data = self.get_modbus_data(master, fields=[control_point],
+                                                    starting_address=address, simulation=False)
+                    except Exception as e:
+                        print("Exception :", str(e))
+                        data = None
+                    print("data: ", data)
+                else:
+                    return None
+        # if control_point in system_fields.keys():
+        #     address = system_fields[control_point].get("address")
+        #     data = self.get_modbus_data(master, fields=[control_point], starting_address=address)
+        # elif control_point in sub_system_fields.keys():
+        #
+        #     sub_system_id = kwargs.get("sub_system_id", None)
+        #     if not sub_system_id:
+        #         print("here2")
+        #         raise Exception("Enter sub system id")
+        #     else:
+        #         address = sub_system_fields[control_point].get("address") + \
+        #                   (sub_system_id * sub_system_fields[control_point].get("multiplier"))
+        #         data = self.get_modbus_data(master, fields=[control_point], starting_address=address)
         print("data: ", data)
-        return data[control_point]
+        return data if data else {control_point: None}
 
     def get_system_control_points_values(self):
-        master = mt.TcpMaster(self.modbus_ip)
+
         outdict = {}
-        for control_point, address_details in system_fields.items():
-            fields = []
-            if address_details["length"] == 2:
-                fields = [control_point, control_point + "_first"]
-            else:
+        field_types = ["pcs", "bms", "arm"]
+        for field_type in field_types:
+            field_details = system_fields[field_type]
+            master = mt.TcpMaster(host=system_details[field_type].get("ip"),
+                                  port=system_details[field_type].get("port"))
+            outdict[field_type] = {}
+            for control_point, point_details in field_details.items():
                 fields = [control_point]
-            data = self.get_modbus_data(master, fields=fields, starting_address=address_details["address"])
-            outdict.update(data)
+                data = self.get_modbus_data(master, fields=fields, starting_address=point_details["address"],
+                                            simulation=False)
+                outdict[field_type].update(data)
         return outdict
 
     def get_sub_system_control_point_values(self, sub_system_id=-1):
@@ -182,53 +224,65 @@ class ModbusManager:
                 outdict.update({sub_system_id: sub_system_data})
         return outdict
 
-    def write_single_register(self, address, value, simulation=SIMULATION):
+    def write_single_register(self, master, address, value, simulation=SIMULATION):
         """Write the values of a single register and check that it is correctly written"""
         if simulation:
             return True
-        result = self.master.execute(self.slave_idx, md.WRITE_SINGLE_REGISTER, address, output_value=value)
-        read_result = self.master.execute(self.slave_idx, md.READ_HOLDING_REGISTERS, address, 1)
-        self.assertEqual(result, read_result)
-
-        return result == read_result
+        result = master.execute(self.slave_idx, md.WRITE_SINGLE_REGISTER, address, output_value=value)
+        print("result: ", result)
+        read_result = master.execute(self.slave_idx, md.READ_HOLDING_REGISTERS, address, 1)[0]
+        print("read result: ", read_result)
+        return read_result == value
 
     def write_multiple_registers(self, address, values, simulation=SIMULATION):
         if simulation:
             return True
         result = self.master.execute(self.slave_idx, md.WRITE_MULTIPLE_REGISTERS, address, output_value=values)
         read_result = self.master.execute(self.slave_idx, md.READ_HOLDING_REGISTERS, address, len(values))
-        self.assertEqual(result, read_result)
-
         return result == read_result
 
+    def get_pcs_status(self, master, control_point_details):
+        read_result = master.execute(self.slave_idx, md.READ_HOLDING_REGISTERS, control_point_details["address"], 1)
+        return read_result[0]
+
     def write_or_toggle_control_point(self, control_point, value, **kwargs):
+        for field_type in ["pcs", "arm", "bms"]:
+            master = mt.TcpMaster(host=system_details[field_type].get("ip"),
+                                  port=system_details[field_type].get("port"))
+            if control_point in system_fields[field_type].keys():
+                if control_point == "pcs_toggle":
+                    current_value = self.get
+                current_value = self.read_single_control_point(control_point).get(control_point, None)
+                print("current val: ", current_value)
+                control_point_details = system_fields[field_type].get(control_point, None)
+                if control_point_details:
+                    print("control point details: ", control_point_details)
+                    if "toggle_values" in control_point_details.keys():
+                        toggle_values = control_point_details.get("toggle_values")
+                        value = toggle_values[1 - toggle_values.index(current_value)]
+                        print("toggle value: ", value)
+                    address = control_point_details.get("address")
+                    print("address to write: ", address)
+                    return self.write_single_register(master, address, value)
 
-        if control_point in system_fields.keys():
-            current_value = self.read_single_control_point(control_point)
-            if "toggle_values" in system_fields[control_point].keys():
-                toggle_values = system_fields[control_point].get("toggle_values")
-                value = toggle_values[1 - toggle_values.index(current_value)]
-            address = system_fields[control_point].get("address")
-            return self.write_single_register(address, value)
+            elif control_point in sub_system_fields[field_type].keys():
 
-        elif control_point in sub_system_fields.keys():
+                sub_system_id = kwargs.get("sub_system_id", None)
 
-            sub_system_id = kwargs.get("sub_system_id", None)
-
-            if sub_system_id is not None:
-                current_value = self.read_single_control_point(control_point, sub_system_id=sub_system_id)
-                if "toggle_values" in sub_system_fields[control_point].keys():
-                    toggle_values = sub_system_fields[control_point].get("toggle_values")
-                    value = toggle_values[1 - toggle_values.index(current_value)]
-                address = sub_system_fields[control_point].get("address") + \
-                          sub_system_fields[control_point].get("multiplier") * sub_system_id
-                return self.write_single_register(address, value)
-            else:
-                raise Exception("enter sub_system_id")
+                if sub_system_id is not None:
+                    current_value = self.read_single_control_point(control_point, sub_system_id=sub_system_id)
+                    if "toggle_values" in sub_system_fields[control_point].keys():
+                        toggle_values = sub_system_fields[control_point].get("toggle_values")
+                        value = toggle_values[1 - toggle_values.index(current_value)]
+                    address = sub_system_fields[control_point].get("address") + \
+                              sub_system_fields[control_point].get("multiplier") * sub_system_id
+                    return self.write_single_register(master, address, value)
+                else:
+                    raise Exception("enter sub_system_id")
 
 
 if __name__ == "__main__":
     manager = ModbusManager()
     print(manager.get_system_control_points_values())
-    print(manager.get_sub_system_control_point_values())
-    print(manager.write_control_point("km1", 1, 1))
+    # print(manager.get_sub_system_control_point_values())
+    # print(manager.write_control_point("km1", 1, 1))
