@@ -11,10 +11,11 @@ from cabinet_multipliers import RTUMultiplier
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "cp_backend.cp_backend.settings")
 django.setup()
-SIMULATION = False
+SIMULATION = True
 sub_system_fields = settings.SUB_SYSTEM_FIELDS
 system_fields = settings.SYSTEM_FIELDS
 system_details = settings.SYSTEM_DETAILS
+system_type = system_details["type"]
 
 
 def getSignedNumber(number, bitLength):
@@ -140,7 +141,9 @@ class ModbusManager:
             traceback.print_exc()
         return return_dict
 
-    def read_single_control_point(self, control_point, **kwargs):
+    def read_single_control_point(self, control_point, simulation=SIMULATION, **kwargs):
+        if simulation:
+            return {control_point: 0}
         field_types = ["pcs", "bms", "arm"]
         for field_type in field_types:
             master = mt.TcpMaster(host=system_details[field_type].get("ip"),
@@ -186,8 +189,7 @@ class ModbusManager:
         print("data: ", data)
         return data if data else {control_point: None}
 
-    def get_system_control_points_values(self):
-
+    def get_system_control_points_values(self, simulation=SIMULATION):
         outdict = {}
         field_types = ["pcs", "bms", "arm"]
         for field_type in field_types:
@@ -197,19 +199,32 @@ class ModbusManager:
             outdict[field_type] = {}
             for control_point, point_details in field_details.items():
                 fields = [control_point]
-                data = self.get_modbus_data(master, fields=fields, starting_address=point_details["address"],
-                                            simulation=False)
+                if simulation:
+                    data = {
+                        control_point: 0
+                    }
+                else:
+                    data = self.get_modbus_data(master, fields=fields, starting_address=point_details["address"],
+                                                simulation=False)
                 outdict[field_type].update(data)
         return outdict
 
-    def get_sub_system_control_point_values(self, sub_system_id=-1):
+    def get_sub_system_control_point_values(self, sub_system_id=-1, simulation=SIMULATION):
+        """
+            if sub_system_id = -1, then control points for all sybsystems will be fetched.
+        """
         master = mt.TcpMaster(self.modbus_ip)
         outdict = {}
         if sub_system_id != -1:
             for control_point, address_details in sub_system_fields.items():
-                data = self.get_modbus_data(master, fields=[control_point],
-                                            starting_address=(address_details["address"]) +
-                                                             (int(sub_system_id) * address_details["multiplier"]))
+                if simulation:
+                    data = {
+                        control_point: 0
+                    }
+                else:
+                    data = self.get_modbus_data(master, fields=[control_point],
+                                                starting_address=(address_details["address"]) +
+                                                                 (int(sub_system_id) * address_details["multiplier"]))
                 outdict.update(data)
         else:
 
@@ -217,15 +232,23 @@ class ModbusManager:
                 sub_system_data = {}
                 print("getting subsystem values for ", sub_system_id)
                 for control_point, address_details in sub_system_fields.items():
-                    sub_system_data.update(self.get_modbus_data(master, fields=[control_point],
-                                                                starting_address=(address_details["address"]) +
-                                                                                 (int(sub_system_id) * address_details[
-                                                                                     "multiplier"])))
+                    if simulation:
+                        data = {
+                            control_point: 0
+                        }
+                        sub_system_data.update(data)
+                    else:
+                        sub_system_data.update(self.get_modbus_data(master, fields=[control_point],
+                                                                    starting_address=(address_details["address"]) +
+                                                                                     (int(sub_system_id) * address_details[
+                                                                                         "multiplier"])))
                 outdict.update({sub_system_id: sub_system_data})
         return outdict
 
     def write_single_register(self, master, address, value, simulation=SIMULATION):
         """Write the values of a single register and check that it is correctly written"""
+        if address == -1:
+            raise Exception("Invalid register address")
         if simulation:
             return True
         result = master.execute(self.slave_idx, md.WRITE_SINGLE_REGISTER, address, output_value=value)
@@ -235,23 +258,25 @@ class ModbusManager:
         return read_result == value
 
     def write_multiple_registers(self, address, values, simulation=SIMULATION):
+        if address == -1:
+            raise Exception("Invalid register address")
         if simulation:
             return True
         result = self.master.execute(self.slave_idx, md.WRITE_MULTIPLE_REGISTERS, address, output_value=values)
         read_result = self.master.execute(self.slave_idx, md.READ_HOLDING_REGISTERS, address, len(values))
         return result == read_result
 
-    def get_pcs_status(self, master, control_point_details):
+    def get_pcs_status(self, master, control_point_details, simulation=SIMULATION):
+        if simulation:
+            return 0
         read_result = master.execute(self.slave_idx, md.READ_HOLDING_REGISTERS, control_point_details["address"], 1)
         return read_result[0]
 
-    def write_or_toggle_control_point(self, control_point, value, **kwargs):
+    def write_or_toggle_control_point(self, control_point, value, simulation=SIMULATION, **kwargs ):
         for field_type in ["pcs", "arm", "bms"]:
             master = mt.TcpMaster(host=system_details[field_type].get("ip"),
                                   port=system_details[field_type].get("port"))
             if control_point in system_fields[field_type].keys():
-                if control_point == "pcs_toggle":
-                    current_value = self.get
                 current_value = self.read_single_control_point(control_point).get(control_point, None)
                 print("current val: ", current_value)
                 control_point_details = system_fields[field_type].get(control_point, None)
@@ -259,26 +284,63 @@ class ModbusManager:
                     print("control point details: ", control_point_details)
                     if "toggle_values" in control_point_details.keys():
                         toggle_values = control_point_details.get("toggle_values")
-                        value = toggle_values[1 - toggle_values.index(current_value)]
+                        toggle_values_keys = list(toggle_values.keys())
+                        value = toggle_values_keys[1 - toggle_values_keys.index(current_value)]
                         print("toggle value: ", value)
-                    address = control_point_details.get("address")
-                    print("address to write: ", address)
-                    return self.write_single_register(master, address, value)
+                    elif "range" in control_point_details.keys():
+                        if value not in range(control_point_details.get("range", (-100, -100))[0],
+                                              control_point_details.get("range", (-100, -100))[1]):
+                            return False
+                    toggle_values = control_point_details.get("toggle_values")
+                    try:
+                        addresses = toggle_values.get(value).get(system_type, None)
+                        return_value = True
+                        # a fault mechanism is required for below operation where write to a subset of registers
+                        # succeeds while the entire operation is failure. The writes should be reversed.
+                        for address in addresses:
+                            print("address to write: ", address)
+                            return_value = return_value and self.write_single_register(master, address, int(value))
+                        return return_value
+                    except:
+                        return False
 
             elif control_point in sub_system_fields[field_type].keys():
 
                 sub_system_id = kwargs.get("sub_system_id", None)
 
                 if sub_system_id is not None:
-                    current_value = self.read_single_control_point(control_point, sub_system_id=sub_system_id)
-                    if "toggle_values" in sub_system_fields[control_point].keys():
-                        toggle_values = sub_system_fields[control_point].get("toggle_values")
-                        value = toggle_values[1 - toggle_values.index(current_value)]
-                    address = sub_system_fields[control_point].get("address") + \
-                              sub_system_fields[control_point].get("multiplier") * sub_system_id
-                    return self.write_single_register(master, address, value)
+                    current_value = self.read_single_control_point(control_point, sub_system_id=sub_system_id)[control_point]
+                    print("current val: ", current_value)
+                    control_point_details = sub_system_fields[field_type].get(control_point, None)
+                    if control_point_details:
+                        print("control point details: ", control_point_details)
+                        if "toggle_values" in control_point_details.keys():
+                            toggle_values = control_point_details.get("toggle_values")
+                            toggle_values_keys = list(toggle_values.keys())
+                            print("toggle value: ", toggle_values_keys)
+                            value = toggle_values_keys[1 - toggle_values_keys.index(current_value)]
+                            print("toggle value: ", value)
+                        elif "range" in control_point_details.keys():
+                            if value not in range(control_point_details.get("range", (-100, -100))[0],
+                                                  control_point_details.get("range", (-100, -100))[1]):
+                                return False
+                        toggle_values = control_point_details.get("toggle_values")
+                        try:
+                            addresses = toggle_values.get(value).get(system_type, None)
+                            return_value = True
+                            # a fault mechanism is required for below operation where write to a subset of registers
+                            # succeeds while the entire operation is failure. The writes should be reversed.
+                            for address in addresses:
+                                address = address + (control_point_details["multiplier"] * sub_system_id)
+                                print("address to write: ", address)
+                                return_value = return_value and self.write_single_register(master, address, int(value))
+                            return return_value
+                        except:
+                            return False
                 else:
                     raise Exception("enter sub_system_id")
+        raise Exception("Could not find the control")
+
 
 
 if __name__ == "__main__":
