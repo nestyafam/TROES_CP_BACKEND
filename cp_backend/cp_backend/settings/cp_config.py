@@ -1,5 +1,5 @@
 OPERATING_MODE = "local"
-
+SIMULATION = False
 SYSTEM_FIELDS = {
     "pcs": {
         "on_off_grid_switch": {
@@ -50,15 +50,17 @@ SYSTEM_FIELDS = {
         },
         "active_power": {
             "address": 53622,
-            "length": 2
+            "length": 2,
+            "range": (0, 500)
         },
         "reactive_power": {
             "address": 53623,
-            "length": 2
+            "length": 2,
+            "range": (0, 500)
         }
     },
     "bms": {
-        "high_voltage_box_contractor": {
+        "high_voltage_box_contactor": {
             "address": 62701,
             "length": 2,
             "toggle_values": {
@@ -168,7 +170,7 @@ SYSTEM_FIELDS = {
                 }
             }
         },
-        "pcs_barn_fan": {
+        "pcs_cabinet_fan": {
             "address": 40306,
             "multiplier": 8,
             "toggle_values": {
@@ -304,19 +306,169 @@ SYSTEM_DETAILS = {
     # type is large if the no is more than 16
     "type": "large",
     "pcs": {
-        "ip": "10.8.0.3",
+        "ip": "10.16.32.2",
         "port": 502
     },
     "bms": {
-        "ip": "10.8.0.3",
-        "port": 2502
+        "ip": "10.16.32.1",
+        "port": 502
     },
     "arm": {
-        "ip": "10.8.0.3",
-        "port": 3502
+        "ip": "10.16.32.3",
+        "port": 502
     }
 }
 # system sizes below based on the no of clusters in the system
 system_sizes = {
     "normal": 16
 }
+
+UI_MAPPING = {
+    "manualControls": [
+        {
+            "name": "High Voltage Box Contactor",
+            "key": "high_voltage_box_contactor",
+            "options": [{"option": 'open', "clicked": False}, {"option": 'combine', "clicked": False}]
+        },
+        {
+            "name": "PCS Compartment Main Contactor",
+            "key": "km1",
+            "options": [{"option": 'open', "clicked": False}, {"option": 'combine', "clicked": False}]
+        },
+        {
+            "name": "PCS Warehouse Auxiliary Contactor KM2",
+            "key": "km2",
+            "options": [{"option": 'open', "clicked": False}, {"option": 'combine', "clicked": False}]
+        },
+        {
+            "name": "Air conditioner Switch Machine",
+            "key": "ac_switch",
+            "options": [{"option": 'boot', "clicked": False}, {"option": 'shutdown', "clicked": False}]
+        },
+        {
+            "name": "Battery Compartment Fan",
+            "key": "battery_bin_1_fan",
+            "options": [{"option": 'open', "clicked": False}, {"option": 'close', "clicked": False}]
+        },
+        {
+            "name": "PCS Cabinet Fan",
+            "key": "pcs_cabinet_fan",
+            "options": [{"option": 'open', "clicked": False}, {"option": 'combine', "clicked": True}]
+        },
+        {
+            "name": "Battery compartment 2 Fan",
+            "key": "battery_bin_2_fan",
+            "options": [{"option": 'open', "clicked": True}, {"option": 'combine', "clicked": False}]
+        },
+        {
+            "name": "Auxiliary contactor for KM3 for PCS",
+            "key": "km3",
+            "options": [{"option": 'boot', "clicked": False}, {"option": 'shutdown', "clicked": False}]
+        }
+    ],
+    "automaticControls": [
+        {
+            "name": "Air Conditioner refrigeration Turn on Temperature",
+            "key": "ac_cooling_on_temp",
+            "value": 17.2
+        },
+        {
+            "name": "Air Conditioner refrigeration Turn off Temperature",
+            "key": "ac_cooling_off_temp",
+            "value": 17.2
+        },
+        {
+            "name": "Air Conditioner heating Turn on Temperature",
+            "key": "ac_heating_on_temp",
+            "value": 17.2
+        },
+        {
+            "name": "Air Conditioner heating Turn off Temperature",
+            "key": "ac_heating_off_temp",
+            "value": 17.2
+        },
+        {
+            "name": "Battery Compartment Fan Turn On Temperature",
+            "key": "battery_compartment_fan_on_temp",
+            "value": 17.2
+        },
+        {
+            "name": "Battery Compartment Fan Turn Off Temperature",
+            "key": "battery_compartment_fan_off_temp",
+            "value": 17.2
+        },
+        {
+            "name": "PCS Compartment Fan Turn On Temperature",
+            "key": "pcs_cabinet_fan_on_temp",
+            "value": 17.2
+        },
+        {
+            "name": "PCS Cabinet Fan Off Temperature",
+            "key": "pcs_cabinet_fan_off_temp",
+            "value": 17.2
+        }
+    ],
+    "automaticProtection": [
+        {
+            "name": "High Temperature Alarm",
+            "key": "high_temp_alarm_value",
+            "value": 17.2
+        },
+        {
+            "name": "Low Temperature Alarm",
+            "key": "low_temp_alarm_value",
+            "value": 17.2
+        },
+        {
+            "name": "High Humidity Alarm",
+            "key": "high_humidity_alarm_value",
+            "value": 17.2
+        },
+        {
+            "name": "Low Humidity Alarm",
+            "key": "low_humidity_alarm_value",
+            "value": 17.2
+        },
+        {
+            "name": "High Temperature Cut-Off System",
+            "key": "high_temp_system_cutoff_value",
+            "value": 17.2
+        },
+        {
+            "name": "Low Temperature Cut-Off System",
+            "key": "low_temp_system_cutoff_value",
+            "value": 17.2
+        },
+        {
+            "name": "High Humidity Cut-Off System",
+            "key": "high_humidity_system_cutoff_value",
+            "value": 17.2
+        },
+        {
+            "name": "Low Humidity Cut-Off System",
+            "key": "low_humidity_system_cutoff_value",
+            "value": 17.2
+        }
+    ],
+    "pcsStateSwitch": [
+        {
+            "name": "PCS Switch Machine",
+            "key": "pcs_start_stop",
+            "options": [{"option": 'open', "clicked": False}, {"option": 'combine', "clicked": False}]
+        },
+        {
+            "name": "ON and OFF Grid Switching",
+            "key": "on_off_grid_switch",
+            "options": [{"option": 'boot', "clicked": False}, {"option": 'shutdown', "clicked": False}]
+        },
+        {
+            "name": "Active Power",
+            "key": "active_power",
+            "value": 800
+        },
+        {
+            "name": "Reactive Power",
+            "key": "reactive_power",
+            "value": 0
+        }
+    ]}

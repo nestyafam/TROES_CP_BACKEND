@@ -11,11 +11,12 @@ from cabinet_multipliers import RTUMultiplier
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "cp_backend.cp_backend.settings")
 django.setup()
-SIMULATION = True
+
 sub_system_fields = settings.SUB_SYSTEM_FIELDS
 system_fields = settings.SYSTEM_FIELDS
 system_details = settings.SYSTEM_DETAILS
 system_type = system_details["type"]
+SIMULATION = settings.SIMULATION
 
 
 def getSignedNumber(number, bitLength):
@@ -103,9 +104,14 @@ class ModbusManager:
             for i in range(0, reps):
                 temp_starting_address = starting_address + (i * self.max_regs_per_request)
                 print("starting address: ", temp_starting_address)
-                hold_value = master.execute(slave=self.slave_idx, function_code=md.READ_HOLDING_REGISTERS,
-                                            starting_address=temp_starting_address,
-                                            quantity_of_x=self.max_regs_per_request, output_value=no_holding_addr)
+                try:
+                    hold_value = master.execute(slave=self.slave_idx, function_code=md.READ_HOLDING_REGISTERS,
+                                                starting_address=temp_starting_address,
+                                                quantity_of_x=self.max_regs_per_request, output_value=no_holding_addr)
+                except Exception as e:
+                    print("Exception :", str(e))
+                    hold_value = None
+
                 # print("len of hold_val: ", len(hold_value))
                 temp_fields_start_index = i * self.max_regs_per_request
                 temp_fields = fields[
@@ -115,12 +121,20 @@ class ModbusManager:
 
                     if field.lower() not in ["spare", "reserved", "reserve"]:
                         print("field: ", field)
-                        val = round(RTUMultiplier.get_cabinet_multiplier(field) * getSignedNumber(hold_value[idx], 16),
-                                    4)
+                        if hold_value:
+                            val = round(
+                                RTUMultiplier.get_cabinet_multiplier(field) * getSignedNumber(hold_value[idx], 16),
+                                4)
+                        else:
+                            val = None
                         return_dict.update({field: val})
-            hold_value = master.execute(slave=self.slave_idx, function_code=md.READ_HOLDING_REGISTERS,
-                                        starting_address=temp_starting_address,
-                                        quantity_of_x=remainder, output_value=no_holding_addr)
+            try:
+                hold_value = master.execute(slave=self.slave_idx, function_code=md.READ_HOLDING_REGISTERS,
+                                            starting_address=temp_starting_address,
+                                            quantity_of_x=remainder, output_value=no_holding_addr)
+            except Exception as e:
+                print("Exception :", str(e))
+                hold_value = None
             # print("len of hold_val: ", hold_value)
             # if there are less than max regs count
             if temp_fields_start_index != 0:
@@ -131,7 +145,12 @@ class ModbusManager:
             for idx, field in enumerate(temp_fields):
                 if field.lower() not in ["spare", "reserved", "reserve"]:
                     print("field: ", field)
-                    val = round(RTUMultiplier.get_cabinet_multiplier(field) * getSignedNumber(hold_value[idx], 16), 4)
+
+                    if hold_value:
+                        val = round(RTUMultiplier.get_cabinet_multiplier(field) * getSignedNumber(hold_value[idx], 16),
+                                    4)
+                    else:
+                        val = None
                     return_dict.update({field: val})
 
             print("dict: ", return_dict)
@@ -196,7 +215,7 @@ class ModbusManager:
             field_details = system_fields[field_type]
             master = mt.TcpMaster(host=system_details[field_type].get("ip"),
                                   port=system_details[field_type].get("port"))
-            outdict[field_type] = {}
+            # outdict[field_type] = {}
             for control_point, point_details in field_details.items():
                 fields = [control_point]
                 if simulation:
@@ -206,7 +225,7 @@ class ModbusManager:
                 else:
                     data = self.get_modbus_data(master, fields=fields, starting_address=point_details["address"],
                                                 simulation=False)
-                outdict[field_type].update(data)
+                outdict.update(data)
         return outdict
 
     def get_sub_system_control_point_values(self, sub_system_id=-1, simulation=SIMULATION):
@@ -240,27 +259,34 @@ class ModbusManager:
                     else:
                         sub_system_data.update(self.get_modbus_data(master, fields=[control_point],
                                                                     starting_address=(address_details["address"]) +
-                                                                                     (int(sub_system_id) * address_details[
-                                                                                         "multiplier"])))
+                                                                                     (int(sub_system_id) *
+                                                                                      address_details[
+                                                                                          "multiplier"])))
                 outdict.update({sub_system_id: sub_system_data})
         return outdict
 
     def write_single_register(self, master, address, value, simulation=SIMULATION):
         """Write the values of a single register and check that it is correctly written"""
+        print("writing {value} to register {address}".format(value=value, address=address))
         if address == -1:
             raise Exception("Invalid register address")
         if simulation:
+            print("simulation on while writing")
             return True
-        result = master.execute(self.slave_idx, md.WRITE_SINGLE_REGISTER, address, output_value=value)
-        print("result: ", result)
-        read_result = master.execute(self.slave_idx, md.READ_HOLDING_REGISTERS, address, 1)[0]
-        print("read result: ", read_result)
-        return read_result == value
+        try:
+            result = master.execute(self.slave_idx, md.WRITE_SINGLE_REGISTER, address, output_value=value)
+            print("result: ", result)
+            return result[1] == value
+        except:
+            traceback.print_exc()
+            return False
+
 
     def write_multiple_registers(self, address, values, simulation=SIMULATION):
         if address == -1:
             raise Exception("Invalid register address")
         if simulation:
+            print("simulation on while writing")
             return True
         result = self.master.execute(self.slave_idx, md.WRITE_MULTIPLE_REGISTERS, address, output_value=values)
         read_result = self.master.execute(self.slave_idx, md.READ_HOLDING_REGISTERS, address, len(values))
@@ -272,7 +298,10 @@ class ModbusManager:
         read_result = master.execute(self.slave_idx, md.READ_HOLDING_REGISTERS, control_point_details["address"], 1)
         return read_result[0]
 
-    def write_or_toggle_control_point(self, control_point, value, simulation=SIMULATION, **kwargs ):
+    def write_or_toggle_control_point(self, control_point, value, simulation=SIMULATION, **kwargs):
+        if control_point in ["pcs_start", "pcs_stop"]:
+            return self.pcs_start_stop(control_point)
+
         for field_type in ["pcs", "arm", "bms"]:
             master = mt.TcpMaster(host=system_details[field_type].get("ip"),
                                   port=system_details[field_type].get("port"))
@@ -287,19 +316,28 @@ class ModbusManager:
                         toggle_values_keys = list(toggle_values.keys())
                         value = toggle_values_keys[1 - toggle_values_keys.index(current_value)]
                         print("toggle value: ", value)
+                        toggle_values = control_point_details.get("toggle_values")
+                        addresses = toggle_values.get(value).get(system_type, None)
                     elif "range" in control_point_details.keys():
+                        print("range found")
                         if value not in range(control_point_details.get("range", (-100, -100))[0],
                                               control_point_details.get("range", (-100, -100))[1]):
+                            print("outside range")
                             return False
-                    toggle_values = control_point_details.get("toggle_values")
+                        else:
+                            print("inside range")
+                            addresses = [control_point_details.get("address", -1)]
+                    else:
+                        print("no range or toggle values found")
+
                     try:
-                        addresses = toggle_values.get(value).get(system_type, None)
-                        return_value = True
+
+                        return_value = False
                         # a fault mechanism is required for below operation where write to a subset of registers
                         # succeeds while the entire operation is failure. The writes should be reversed.
                         for address in addresses:
                             print("address to write: ", address)
-                            return_value = return_value and self.write_single_register(master, address, int(value))
+                            return_value = return_value or self.write_single_register(master, address, int(value))
                         return return_value
                     except:
                         return False
@@ -309,7 +347,8 @@ class ModbusManager:
                 sub_system_id = kwargs.get("sub_system_id", None)
 
                 if sub_system_id is not None:
-                    current_value = self.read_single_control_point(control_point, sub_system_id=sub_system_id)[control_point]
+                    current_value = self.read_single_control_point(control_point, sub_system_id=sub_system_id)[
+                        control_point]
                     print("current val: ", current_value)
                     control_point_details = sub_system_fields[field_type].get(control_point, None)
                     if control_point_details:
@@ -341,6 +380,34 @@ class ModbusManager:
                     raise Exception("enter sub_system_id")
         raise Exception("Could not find the control")
 
+    def pcs_start_stop(self, control_point, simulation=SIMULATION):
+        field_type = "pcs"
+        master = mt.TcpMaster(host=system_details[field_type].get("ip"),
+                              port=system_details[field_type].get("port"))
+        control_point_details = system_fields[field_type].get(control_point, None)
+        if control_point_details:
+            print("control point details: ", control_point_details)
+            if "toggle_values" in control_point_details.keys():
+                toggle_values = control_point_details.get("toggle_values")
+                value = 1
+                addresses = toggle_values.get(value).get(system_type, None)
+                try:
+
+                    return_value = False
+                    # a fault mechanism is required for below operation where write to a subset of registers
+                    # succeeds while the entire operation is failure. The writes should be reversed.
+                    for address in addresses:
+                        print("address to write: ", address)
+                        return_value = return_value or self.write_single_register(master, address, int(value))
+                        print("return value in pcs_start_stop: ", return_value)
+                    return return_value
+                except:
+                    traceback.print_exc()
+                    return False
+            else:
+                return False
+        else:
+            return False
 
 
 if __name__ == "__main__":
