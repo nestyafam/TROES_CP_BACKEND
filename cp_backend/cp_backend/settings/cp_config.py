@@ -1,5 +1,5 @@
 OPERATING_MODE = "local"
-SIMULATION = False
+SIMULATION = True
 SYSTEM_FIELDS = {
     "pcs": {
         "on_off_grid_switch": {

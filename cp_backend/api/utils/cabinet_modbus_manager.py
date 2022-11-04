@@ -161,8 +161,6 @@ class ModbusManager:
         return return_dict
 
     def read_single_control_point(self, control_point, simulation=SIMULATION, **kwargs):
-        if simulation:
-            return {control_point: 0}
         field_types = ["pcs", "bms", "arm"]
         for field_type in field_types:
             master = mt.TcpMaster(host=system_details[field_type].get("ip"),
@@ -186,6 +184,7 @@ class ModbusManager:
                     try:
                         data = self.get_modbus_data(master, fields=[control_point],
                                                     starting_address=address, simulation=False)
+
                     except Exception as e:
                         print("Exception :", str(e))
                         data = None
@@ -205,7 +204,7 @@ class ModbusManager:
         #         address = sub_system_fields[control_point].get("address") + \
         #                   (sub_system_id * sub_system_fields[control_point].get("multiplier"))
         #         data = self.get_modbus_data(master, fields=[control_point], starting_address=address)
-        print("data: ", data)
+        # print("data: ", data)
         return data if data else {control_point: None}
 
     def get_system_control_points_values(self, simulation=SIMULATION):
