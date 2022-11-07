@@ -1,5 +1,10 @@
+"""
+This file contains the config for control feature of this application. For the config for monitor feature please
+use monitor_config.py
+"""
 OPERATING_MODE = "local"
-SIMULATION = True
+
+SIMULATION = True   # SIMULATION flag for the entire backend
 SYSTEM_FIELDS = {
     "pcs": {
         "on_off_grid_switch": {
@@ -299,9 +304,9 @@ SUB_SYSTEM_FIELDS = {
 
 SYSTEM_DETAILS = {
     "ip": "10.8.0.3",
-    "bc_count": 4,
-    "bsu_count": 12,
-    "cell_count": 16,
+    "bc_count": 4,  # cluster count
+    "bsu_count": 12,    # bsu per cluster
+    "cell_count": 16,   # cells per bsu
     # system type is normal if the no of clusters are less than or equal to 16
     # type is large if the no is more than 16
     "type": "large",

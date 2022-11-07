@@ -20,45 +20,11 @@ class MonitorView(APIView):
             data = request.data
             request_type = data.get("request_type", None)
             response_data = {}
+            manager = ModbusManager()
             if request_type == "cluster":
 
-                response_data["clusters_data"] = [
-                    {
-                        "image":
-                            "./assets/img/psotwkbdo0qm9x3aamhgnzemakz7arke6tga20679f1-c016-4b20-b8cc-df5a9668237e.png",
-                        "state": "Normal",
-                        "clusters_soc": "70%",
-                        "total_pressure": "768V",
-                        "soh_cluster": "99%",
-                    },
-                    {
-                        "image":
-                            "./assets/img/psotwkbdo0qm9x3aamhgnzemakz7arke6tga20679f1-c016-4b20-b8cc-df5a9668237e.png",
-                        "state": "Normal",
-                        "clusters_soc": "70%",
-                        "total_pressure": "768V",
-                        "soh_cluster": "99%",
-                    },
-                    {
-                        "image":
-                            "./assets/img/psotwkbdo0qm9x3aamhgnzemakz7arke6tga20679f1-c016-4b20-b8cc-df5a9668237e.png",
-                        "state": "Normal",
-                        "clusters_soc": "70%",
-                        "total_pressure": "768V",
-                        "soh_cluster": "99%",
-                    },
-                ]
-                response_data["clusters_overview"] = [
-                    {"highest_battery_cluster_voltage": "768V"},
-                    {"minimum_battery_cluster_voltage": "762V"},
-                    {"average_total_battery_cluster_pressure": "764V",
-                     },
-                    {"differential_pressure": "6V"},
-                    {"max_cell_temp": "32"},
-                    {"min_cell_temp": "29"},
-                    {"avg_cell_temp": "31"},
-                    {"cell_temp_diff": "3"},
-                ]
+                response_data["clusters_data"] = manager.get_clusters_data()
+                response_data["clusters_overview"] = manager.get_clusters_overview()
 
             elif request_type == "module":
                 cluster_id = data.get("cluster_id")
@@ -131,7 +97,7 @@ class MonitorView(APIView):
 
 
             else:
-                return Response(data={"message": "request type found"}, status=400)
+                return Response(data={"message": "request type not found"}, status=400)
             return Response(data=response_data, status=200)
         except Exception as e:
             traceback.print_exc()

@@ -408,6 +408,66 @@ class ModbusManager:
         else:
             return False
 
+    def get_clusters_data(self, cluster_no=None):
+        return [
+                    {
+                        "image":
+                            "./assets/img/psotwkbdo0qm9x3aamhgnzemakz7arke6tga20679f1-c016-4b20-b8cc-df5a9668237e.png",
+                        "state": "Normal",
+                        "clusters_soc": "70%",
+                        "total_pressure": "768V",
+                        "soh_cluster": "99%",
+                    },
+                    {
+                        "image":
+                            "./assets/img/psotwkbdo0qm9x3aamhgnzemakz7arke6tga20679f1-c016-4b20-b8cc-df5a9668237e.png",
+                        "state": "Normal",
+                        "clusters_soc": "70%",
+                        "total_pressure": "768V",
+                        "soh_cluster": "99%",
+                    },
+                    {
+                        "image":
+                            "./assets/img/psotwkbdo0qm9x3aamhgnzemakz7arke6tga20679f1-c016-4b20-b8cc-df5a9668237e.png",
+                        "state": "Normal",
+                        "clusters_soc": "70%",
+                        "total_pressure": "768V",
+                        "soh_cluster": "99%",
+                    },
+                ]
+
+    def get_module_data(self, cluster_no=None, module_no=None):
+        return []
+
+    def get_clusters_overview(self):
+
+        return [
+                    {"highest_battery_cluster_voltage": "768V"},
+                    {"minimum_battery_cluster_voltage": "762V"},
+                    {"average_total_battery_cluster_pressure": "764V",
+                     },
+                    {"differential_pressure": "6V"},
+                    {"max_cell_temp": "32"},
+                    {"min_cell_temp": "29"},
+                    {"avg_cell_temp": "31"},
+                    {"cell_temp_diff": "3"},
+                ]
+
+    def get_operating_status_data(self):
+        return {}
+
+    def get_battery_data(self):
+        return {}
+
+    def get_system_data(self):
+        return {}
+
+    def get_environment_data(self):
+        return {}
+
+    def get_pcs_data(self):
+        return {}
+
 
 if __name__ == "__main__":
     manager = ModbusManager()

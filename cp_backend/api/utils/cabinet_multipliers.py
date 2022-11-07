@@ -4,7 +4,7 @@ class RTUMultiplier:
     def get_cabinet_multiplier(key):
         """
         params: key
-        return: values of RTU_MULTIPLIERS if key matches else None
+        return: values of RTU_MULTIPLIERS if key matches else 1
         """
 
         RTU_MULTIPLIERS = {
