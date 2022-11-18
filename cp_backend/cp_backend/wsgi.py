@@ -14,3 +14,5 @@ from django.core.wsgi import get_wsgi_application
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'cp_backend.settings')
 
 application = get_wsgi_application()
+"""PYTHONPATH = 'pwd'/..gunicorn --bind 0:8000 cp_backend.wsgi:application"""
+
